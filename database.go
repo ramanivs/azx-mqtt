@@ -12,7 +12,7 @@ import (
 // DB connection settings — equivalent to the private static properties
 // on the PHP Database class.
 const (
-	dbName     = "INAM"
+	dbName     = "inam-copy"
 	dbHost     = "172.16.50.166"
 	dbPort     = 16306
 	dbUsername = "inam_admin"
