@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -89,9 +90,23 @@ func main() {
 		recordError("Could not finish reading subscriptions from MySQL: %v", err)
 	}
 	rows.Close()
-	fmt.Printf("Loaded %d subscriptions. Subscribing to MQTT topics...\n", len(topics))
 
+	var subscribableTopics []topicInfo
 	for _, t := range topics {
+		if shouldSubscribe(t.topic) {
+			subscribableTopics = append(subscribableTopics, t)
+			continue
+		}
+
+		fmt.Printf("Skipping topic %q because it does not start with \"Azx\" or \"Evt\".\n", t.topic)
+	}
+
+	fmt.Printf("Total topics loaded      : %d\n", len(topics))
+	fmt.Printf("Topics subscribed        : %d\n", len(subscribableTopics))
+	fmt.Printf("Topics skipped           : %d\n", len(topics)-len(subscribableTopics))
+	fmt.Println("Subscribing to MQTT topics...")
+
+	for _, t := range subscribableTopics {
 		handler, ok := handlerRegistry[t.dtypeF]
 		if !ok {
 			recordError("No message handler is configured for dtype_fn %q on topic %s; skipping this subscription", t.dtypeF, t.topic)
@@ -128,6 +143,16 @@ func main() {
 
 	fmt.Println("Shutdown signal received. Disconnecting from MQTT and MySQL.")
 	printStats("Final stats:")
+}
+
+func shouldSubscribe(topic string) bool {
+	allowedPrefixes := []string{"Azx", "Evt"}
+	for _, prefix := range allowedPrefixes {
+		if strings.HasPrefix(topic, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 func printStartupBanner() {
