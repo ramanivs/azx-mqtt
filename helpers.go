@@ -19,6 +19,35 @@ func init() {
 	istLocation = loc
 }
 
+var deviceTimeLayouts = []string{
+	"2006-01-02T15:04:05",
+	"02-01-2006 15:04:05",
+	"02-01-2006T15:04:05",
+	"2006-01-02 15:04:05",
+}
+
+// parseDeviceTime parses timestamps reported by supported device families.
+//
+// Add future timestamp formats to deviceTimeLayouts using Go's reference time
+// (Mon Jan 2 15:04:05 MST 2006). Keep RFC3339 parsing below for timestamps
+// that include an explicit timezone offset.
+func parseDeviceTime(value string) (time.Time, error) {
+	for _, layout := range deviceTimeLayouts {
+		if parsed, err := time.ParseInLocation(layout, value, istLocation); err == nil {
+			return parsed, nil
+		}
+	}
+
+	if parsed, err := time.Parse(time.RFC3339, value); err == nil {
+		return parsed.In(istLocation), nil
+	}
+	if parsed, err := time.Parse(time.RFC3339Nano, value); err == nil {
+		return parsed.In(istLocation), nil
+	}
+
+	return time.Time{}, fmt.Errorf("unsupported device timestamp format: %q", value)
+}
+
 // dbFormat mirrors the PHP dbFormat() function: if the device supplied a
 // timestamp that parses cleanly and is within 2 minutes of "now", use it;
 // otherwise fall back to the current time. Returns a time.Time in the
@@ -28,10 +57,9 @@ func dbFormat(dateTTime string, currentTime time.Time) time.Time {
 		return currentTime
 	}
 
-	// PHP format 'Y-m-d\TH:i:s'  ->  Go layout "2006-01-02T15:04:05"
-	received, err := time.ParseInLocation("2006-01-02T15:04:05", dateTTime, istLocation)
+	received, err := parseDeviceTime(dateTTime)
 	if err != nil {
-		recordError("Device timestamp %q is not in the expected format YYYY-MM-DDTHH:MM:SS; using the current time", dateTTime)
+		recordError("Device timestamp %q is not in a supported format; using the current time", dateTTime)
 		return currentTime
 	}
 
