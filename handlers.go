@@ -14,7 +14,7 @@ import (
 func procSMTMsg(topic, msg string) {
 	currentTime := time.Now().In(istLocation)
 
-	fmt.Println(topic + "the message:" + msg)
+	fmt.Printf("Received message on topic %s: %s\n", topic, msg)
 
 	stnid := topicValue(topic)
 	status := "A"
@@ -41,7 +41,7 @@ func procSMTMsg(topic, msg string) {
 	} else {
 		var data map[string]interface{}
 		if err := json.Unmarshal([]byte(msg), &data); err != nil {
-			fmt.Println("Failed to decode JSON:", err)
+			recordError("Could not decode smart meter payload on topic %s as JSON: %v", topic, err)
 			return
 		}
 
@@ -137,9 +137,10 @@ func procSMTMsg(topic, msg string) {
 		temperature, freeHeap, rfid, totalEnergy,
 	)
 	if err != nil {
-		fmt.Println("Error:", err)
+		recordError("Could not write smart meter data for device %s to MySQL: %v", stnid, err)
 		return
 	}
+	recordDatabaseWrite()
 
 	updateSwitchStatus(mysqlDB, stnid, switch_)
 }
@@ -149,7 +150,7 @@ func procSMTMsg(topic, msg string) {
 func procWLCMsg(topic, msg string) {
 	currentTime := time.Now().In(istLocation)
 
-	fmt.Println(topic + "the message:" + msg)
+	fmt.Printf("Received message on topic %s: %s\n", topic, msg)
 
 	stnid := topicValue(topic)
 	status := "A"
@@ -174,7 +175,7 @@ func procWLCMsg(topic, msg string) {
 	} else {
 		var data map[string]interface{}
 		if err := json.Unmarshal([]byte(msg), &data); err != nil {
-			fmt.Println("Failed to decode JSON:", err)
+			recordError("Could not decode water-level payload on topic %s as JSON: %v", topic, err)
 			return
 		}
 
@@ -209,9 +210,10 @@ func procWLCMsg(topic, msg string) {
 		factor, dryrun, automode, sumptank, overheadtank, waterlevel, tankstatus, switch_, energy,
 	)
 	if err != nil {
-		fmt.Println("Error:", err)
+		recordError("Could not write water-level data for device %s to MySQL: %v", stnid, err)
 		return
 	}
+	recordDatabaseWrite()
 
 	updateSwitchStatus(mysqlDB, stnid, switch_)
 }
@@ -222,7 +224,7 @@ func updateSwitchStatus(db *sql.DB, stnid, switch_ string) {
 	var currentSwitch sql.NullString
 	err := db.QueryRow(`SELECT switch FROM device_tbl WHERE device_id = ?`, stnid).Scan(&currentSwitch)
 	if err != nil {
-		fmt.Println("Error:", err)
+		recordError("Could not read current switch status for device %s from MySQL: %v", stnid, err)
 		return
 	}
 
@@ -232,8 +234,10 @@ func updateSwitchStatus(db *sql.DB, stnid, switch_ string) {
 		_, err = db.Exec(`UPDATE device_tbl SET switch = ? WHERE device_id = ?`, switch_, stnid)
 	}
 	if err != nil {
-		fmt.Println("Error:", err)
+		recordError("Could not update switch status for device %s in MySQL: %v", stnid, err)
+		return
 	}
+	recordDatabaseWrite()
 }
 
 func boolToSwitch(b bool) string {

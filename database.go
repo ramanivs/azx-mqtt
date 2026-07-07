@@ -3,7 +3,7 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"log"
+	"os"
 	"sync"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -21,7 +21,6 @@ const (
 
 var (
 	dbConn *sql.DB
-	dbOnce sync.Once
 	dbMu   sync.Mutex
 )
 
@@ -43,10 +42,12 @@ func ConnectDB() *sql.DB {
 
 	conn, err := sql.Open("mysql", dsn)
 	if err != nil {
-		log.Fatalf("Connection failed: %v", err)
+		recordError("Could not prepare the MySQL connection: %v", err)
+		os.Exit(1)
 	}
 	if err := conn.Ping(); err != nil {
-		log.Fatalf("Connection failed: %v", err)
+		recordError("Could not connect to MySQL at %s:%d using database %s: %v", dbHost, dbPort, dbName, err)
+		os.Exit(1)
 	}
 
 	dbConn = conn

@@ -31,7 +31,7 @@ func dbFormat(dateTTime string, currentTime time.Time) time.Time {
 	// PHP format 'Y-m-d\TH:i:s'  ->  Go layout "2006-01-02T15:04:05"
 	received, err := time.ParseInLocation("2006-01-02T15:04:05", dateTTime, istLocation)
 	if err != nil {
-		fmt.Printf("\nInvalid DateTime format received: %s\n", dateTTime)
+		recordError("Device timestamp %q is not in the expected format YYYY-MM-DDTHH:MM:SS; using the current time", dateTTime)
 		return currentTime
 	}
 
@@ -56,7 +56,7 @@ func toUTC(t time.Time) string {
 func logRawJson(topic, msg string) {
 	f, err := os.OpenFile("mqtt_messages.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		fmt.Println("Failed to open log file:", err)
+		recordError("Could not open mqtt_messages.log for writing: %v", err)
 		return
 	}
 	defer f.Close()
